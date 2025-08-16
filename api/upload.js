@@ -1,9 +1,9 @@
 import Busboy from "busboy";
-import FormData from "form-data";
+import fetch from "node-fetch";
 
 export const config = {
   api: {
-    bodyParser: false, // WAJIB
+    bodyParser: false,
   },
 };
 
@@ -13,47 +13,39 @@ export default async function handler(req, res) {
   }
 
   const busboy = Busboy({ headers: req.headers });
+  let fileBuffer;
+  let fileName;
 
-  let uploadPromise = new Promise((resolve, reject) => {
-    let fileData = [];
-    let filename = "";
-
-    busboy.on("file", (fieldname, file, info) => {
-      filename = info.filename;
-      file.on("data", (data) => {
-        fileData.push(data);
+  await new Promise((resolve, reject) => {
+    busboy.on("file", (fieldname, file, filename) => {
+      fileName = filename;
+      const chunks = [];
+      file.on("data", (chunk) => chunks.push(chunk));
+      file.on("end", () => {
+        fileBuffer = Buffer.concat(chunks);
       });
-      file.on("end", () => {});
     });
 
-    busboy.on("finish", async () => {
-      try {
-        const buffer = Buffer.concat(fileData);
-
-        const formData = new FormData();
-        formData.append("reqtype", "fileupload");
-        formData.append("fileToUpload", buffer, filename);
-
-        const uploadRes = await fetch("https://catbox.moe/user/api.php", {
-          method: "POST",
-          body: formData,
-          headers: formData.getHeaders(),
-        });
-
-        const link = await uploadRes.text();
-        resolve(link.trim());
-      } catch (err) {
-        reject(err);
-      }
-    });
+    busboy.on("finish", resolve);
+    busboy.on("error", reject);
 
     req.pipe(busboy);
   });
 
   try {
-    const link = await uploadPromise;
-    res.status(200).json({ link });
+    const formData = new FormData();
+    formData.append("reqtype", "fileupload");
+    formData.append("fileToUpload", new Blob([fileBuffer]), fileName);
+
+    const response = await fetch("https://catbox.moe/user/api.php", {
+      method: "POST",
+      body: formData,
+    });
+
+    const link = await response.text();
+    res.status(200).json({ link: link.trim() });
   } catch (err) {
-    res.status(500).json({ error: "Upload gagal", detail: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Upload failed" });
   }
 }
