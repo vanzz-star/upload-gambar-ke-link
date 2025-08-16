@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VanzzCloud Uploader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: url('https://files.catbox.moe/8o5gnw.png') no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      color: white;
+    }
+    .upload-box {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 30px;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow: 0px 5px 20px rgba(0,0,0,0.5);
+    }
+    input[type="file"] {
+      margin: 15px 0;
+      color: white;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #3498db;
+      color: white;
+      cursor: pointer;
+    }
+    .link {
+      margin-top: 15px;
+      padding: 10px;
+      background: #222;
+      border-radius: 8px;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="upload-box">
+    <h1>VanzzCloud Upload</h1>
+    <p>Upload gambar dan dapatkan link permanen</p>
+    <input type="file" id="fileInput" />
+    <br />
+    <button onclick="uploadFile()">Upload</button>
+    <div id="result" class="link"></div>
+  </div>
+
+  <script>
+    async function uploadFile() {
+      const fileInput = document.getElementById("fileInput");
+      if (!fileInput.files.length) {
+        alert("Pilih file dulu!");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      document.getElementById("result").innerHTML = "⏳ Uploading...";
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (data.link) {
+        document.getElementById("result").innerHTML = `
+          ✅ <a href="${data.link}" target="_blank" style="color: #4caf50;">${data.link}</a>
+        `;
+      } else {
+        document.getElementById("result").innerHTML = "❌ Upload gagal: " + (data.error || "unknown error");
+      }
+    }
+  </script>
+</body>
+</html>
