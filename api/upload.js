@@ -4,7 +4,7 @@ import FormData from "form-data";
 
 export const config = {
   api: {
-    bodyParser: false, // penting biar bisa handle file upload
+    bodyParser: false, // WAJIB di Vercel
   },
 };
 
@@ -17,12 +17,13 @@ export default async function handler(req, res) {
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      return res.status(500).json({ error: "Error parsing form" });
+      return res.status(500).json({ error: "Form parse error" });
     }
 
     try {
       const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
       const filePath = uploadedFile.filepath;
+
       const fileStream = fs.createReadStream(filePath);
 
       const formData = new FormData();
@@ -36,9 +37,10 @@ export default async function handler(req, res) {
       });
 
       const link = await uploadRes.text();
-      return res.status(200).json({ link });
+
+      return res.status(200).json({ link: link.trim() });
     } catch (e) {
-      return res.status(500).json({ error: "Upload gagal", details: e.message });
+      return res.status(500).json({ error: "Upload gagal", detail: e.message });
     }
   });
 }
