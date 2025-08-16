@@ -1,10 +1,9 @@
-import formidable from "formidable";
-import fs from "fs";
+import Busboy from "busboy";
 import FormData from "form-data";
 
 export const config = {
   api: {
-    bodyParser: false, // WAJIB di Vercel
+    bodyParser: false, // WAJIB
   },
 };
 
@@ -13,34 +12,48 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const form = formidable({ multiples: false });
+  const busboy = Busboy({ headers: req.headers });
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) {
-      return res.status(500).json({ error: "Form parse error" });
-    }
+  let uploadPromise = new Promise((resolve, reject) => {
+    let fileData = [];
+    let filename = "";
 
-    try {
-      const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
-      const filePath = uploadedFile.filepath;
-
-      const fileStream = fs.createReadStream(filePath);
-
-      const formData = new FormData();
-      formData.append("reqtype", "fileupload");
-      formData.append("fileToUpload", fileStream, uploadedFile.originalFilename);
-
-      const uploadRes = await fetch("https://catbox.moe/user/api.php", {
-        method: "POST",
-        body: formData,
-        headers: formData.getHeaders(),
+    busboy.on("file", (fieldname, file, info) => {
+      filename = info.filename;
+      file.on("data", (data) => {
+        fileData.push(data);
       });
+      file.on("end", () => {});
+    });
 
-      const link = await uploadRes.text();
+    busboy.on("finish", async () => {
+      try {
+        const buffer = Buffer.concat(fileData);
 
-      return res.status(200).json({ link: link.trim() });
-    } catch (e) {
-      return res.status(500).json({ error: "Upload gagal", detail: e.message });
-    }
+        const formData = new FormData();
+        formData.append("reqtype", "fileupload");
+        formData.append("fileToUpload", buffer, filename);
+
+        const uploadRes = await fetch("https://catbox.moe/user/api.php", {
+          method: "POST",
+          body: formData,
+          headers: formData.getHeaders(),
+        });
+
+        const link = await uploadRes.text();
+        resolve(link.trim());
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    req.pipe(busboy);
   });
+
+  try {
+    const link = await uploadPromise;
+    res.status(200).json({ link });
+  } catch (err) {
+    res.status(500).json({ error: "Upload gagal", detail: err.message });
+  }
 }
